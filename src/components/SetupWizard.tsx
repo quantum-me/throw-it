@@ -5,7 +5,6 @@ import {
   Crown,
   Flame,
   Heart,
-  Palette,
   Play,
   RotateCcw,
   Shield,
@@ -26,6 +25,7 @@ import {
   MIN_ROWS,
 } from '../engine/gameEngine';
 import type { Player, RoboDifficulty } from '../engine/types';
+import { ColorPalettePicker } from './ColorPalettePicker';
 
 interface AvatarIconProps {
   avatar: string;
@@ -155,19 +155,19 @@ export const SetupWizard: React.FC = () => {
   return (
     <div className="flex-1 max-w-4xl mx-auto px-4 py-6 w-full flex flex-col justify-center">
       {/* Wizard Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-game-border">
+      <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setView('home')}
-            className="p-2 rounded-xl bg-game-surfaceLight hover:bg-game-border text-slate-300 transition"
+            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-game-surfaceLight dark:hover:bg-game-border text-slate-700 dark:text-slate-300 transition"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h2 className="text-2xl font-bold text-white">
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white">
               {selectedMode === 'robo' ? 'Configure Robo Match' : 'Pass & Play Setup'}
             </h2>
-            <p className="text-xs sm:text-sm text-slate-400">
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
               Customize players, colors, board dimensions, and match rules.
             </p>
           </div>
@@ -175,10 +175,10 @@ export const SetupWizard: React.FC = () => {
 
         <button
           onClick={autoAssignColors}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-game-surfaceLight hover:bg-game-border text-slate-300 border border-slate-700/50"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-game-surfaceLight dark:hover:bg-game-border text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700/50"
           title="Auto-assign unique palette"
         >
-          <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
+          <RotateCcw className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400" />
           <span>Reset Palette</span>
         </button>
       </div>
@@ -188,13 +188,13 @@ export const SetupWizard: React.FC = () => {
         <div className="md:col-span-7 flex flex-col gap-4">
           {/* Player Count Selection (for local mode) */}
           {selectedMode === 'local' && (
-            <div className="p-4 rounded-xl bg-game-surface border border-game-border">
+            <div className="p-4 rounded-2xl bg-white dark:bg-game-surface border border-slate-200 dark:border-game-border shadow-sm">
               <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-bold text-white flex items-center gap-2">
-                  <Users className="w-4 h-4 text-fuchsia-400" />
+                <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Users className="w-4 h-4 text-fuchsia-500 dark:text-fuchsia-400" />
                   Number of Players (2–7)
                 </label>
-                <span className="text-xs font-bold text-fuchsia-400 bg-fuchsia-500/10 px-2 py-0.5 rounded border border-fuchsia-500/20">
+                <span className="text-xs font-bold text-fuchsia-600 dark:text-fuchsia-400 bg-fuchsia-50 dark:bg-fuchsia-500/10 px-2.5 py-0.5 rounded-full border border-fuchsia-200 dark:border-fuchsia-500/20">
                   {playerCount} Players
                 </span>
               </div>
@@ -203,10 +203,10 @@ export const SetupWizard: React.FC = () => {
                   <button
                     key={num}
                     onClick={() => handlePlayerCountChange(num)}
-                    className={`py-2 text-sm font-bold rounded-lg border transition ${
+                    className={`py-2 text-sm font-bold rounded-xl border transition ${
                       playerCount === num
-                        ? 'bg-fuchsia-600 text-white border-fuchsia-400 shadow-md shadow-fuchsia-500/20'
-                        : 'bg-game-surfaceLight text-slate-400 border-slate-700/50 hover:bg-game-border hover:text-white'
+                        ? 'bg-fuchsia-600 text-white border-fuchsia-500 shadow-md shadow-fuchsia-500/20'
+                        : 'bg-slate-50 dark:bg-game-surfaceLight text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-game-border hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     {num}P
@@ -218,9 +218,9 @@ export const SetupWizard: React.FC = () => {
 
           {/* Robo Difficulty (for Robo mode) */}
           {selectedMode === 'robo' && (
-            <div className="p-4 rounded-xl bg-game-surface border border-game-border">
-              <label className="text-sm font-bold text-white flex items-center gap-2 mb-3">
-                <Bot className="w-4 h-4 text-cyan-400" />
+            <div className="p-4 rounded-2xl bg-white dark:bg-game-surface border border-slate-200 dark:border-game-border shadow-sm">
+              <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-3">
+                <Bot className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
                 Robot AI Difficulty
               </label>
               <div className="grid grid-cols-3 gap-2">
@@ -228,17 +228,17 @@ export const SetupWizard: React.FC = () => {
                   <button
                     key={lvl}
                     onClick={() => setDifficulty(lvl)}
-                    className={`py-2 px-3 text-xs sm:text-sm font-bold capitalize rounded-lg border transition ${
+                    className={`py-2 px-3 text-xs sm:text-sm font-bold capitalize rounded-xl border transition ${
                       difficulty === lvl
-                        ? 'bg-cyan-500 text-slate-950 border-cyan-300 shadow-md shadow-cyan-500/20'
-                        : 'bg-game-surfaceLight text-slate-400 border-slate-700/50 hover:bg-game-border hover:text-white'
+                        ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md shadow-cyan-500/20 font-black'
+                        : 'bg-slate-50 dark:bg-game-surfaceLight text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-game-border hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     {lvl}
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-slate-400 mt-2">
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-2.5">
                 {difficulty === 'easy' && 'Casual play. Makes safe moves with random placement.'}
                 {difficulty === 'medium' && 'Sharp tactician. Seizes immediate wins & blocks lethal opponent threats.'}
                 {difficulty === 'hard' && 'Master strategist. Minimax lookahead with deep positional heuristics.'}
@@ -248,11 +248,11 @@ export const SetupWizard: React.FC = () => {
 
           {/* Duplicate Color Warning */}
           {hasDuplicateColors && (
-            <div className="p-3 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs flex items-center justify-between">
-              <span>Warning: Multiple players have matching colors. Please select distinct colors.</span>
+            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-500/40 text-amber-800 dark:text-amber-300 text-xs flex items-center justify-between">
+              <span>Multiple players have matching colors. Please select distinct colors.</span>
               <button
                 onClick={autoAssignColors}
-                className="font-bold underline ml-2 hover:text-white"
+                className="font-bold underline ml-2 hover:text-amber-950 dark:hover:text-white"
               >
                 Auto-fix
               </button>
@@ -264,7 +264,7 @@ export const SetupWizard: React.FC = () => {
             {players.map((player, idx) => (
               <div
                 key={player.id}
-                className="p-3.5 rounded-xl bg-game-surface border border-game-border flex flex-col gap-2.5"
+                className="p-3.5 rounded-2xl bg-white dark:bg-game-surface border border-slate-200 dark:border-game-border flex flex-col gap-3 shadow-sm"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 flex-1">
@@ -275,12 +275,12 @@ export const SetupWizard: React.FC = () => {
                       maxLength={16}
                       disabled={player.isRobot}
                       onChange={(e) => updatePlayer(idx, { name: e.target.value })}
-                      className="bg-game-surfaceLight border border-slate-700/70 rounded-lg px-2.5 py-1 text-sm font-semibold text-white focus:outline-none focus:border-cyan-400 w-full max-w-[180px]"
+                      className="bg-slate-50 dark:bg-game-surfaceLight border border-slate-300 dark:border-slate-700/70 rounded-lg px-2.5 py-1 text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-cyan-400 w-full max-w-[180px]"
                     />
                   </div>
 
                   {/* Avatar Picker */}
-                  <div className="flex items-center gap-1 bg-game-surfaceLight/80 p-1 rounded-lg border border-slate-700/50">
+                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-game-surfaceLight/80 p-1 rounded-lg border border-slate-200 dark:border-slate-700/50">
                     {DEFAULT_AVATARS.slice(0, 4).map((av) => (
                       <button
                         key={av}
@@ -288,7 +288,7 @@ export const SetupWizard: React.FC = () => {
                         className={`p-1 rounded ${
                           player.avatar === av
                             ? 'bg-cyan-500 text-slate-950'
-                            : 'text-slate-400 hover:text-white'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                         }`}
                         title={av}
                       >
@@ -298,25 +298,12 @@ export const SetupWizard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Color Palette Row */}
-                <div className="flex items-center gap-2 pt-1">
-                  <Palette className="w-3.5 h-3.5 text-slate-400" />
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {DEFAULT_PALETTE.map((c) => (
-                      <button
-                        key={c}
-                        onClick={() => updatePlayer(idx, { color: c })}
-                        className={`w-6 h-6 rounded-full border-2 transition ${
-                          player.color === c
-                            ? 'border-white scale-110 shadow-md ring-2 ring-cyan-400'
-                            : 'border-transparent opacity-80 hover:opacity-100 hover:scale-105'
-                        }`}
-                        style={{ backgroundColor: c }}
-                        title={c}
-                      />
-                    ))}
-                  </div>
-                </div>
+                {/* Color Palette Picker with 16 presets + full RGB spectrum */}
+                <ColorPalettePicker
+                  selectedColor={player.color}
+                  onSelectColor={(color) => updatePlayer(idx, { color })}
+                  label="Select Color"
+                />
               </div>
             ))}
           </div>
@@ -325,10 +312,10 @@ export const SetupWizard: React.FC = () => {
         {/* Right Column: Board & Match Preferences */}
         <div className="md:col-span-5 flex flex-col gap-4">
           {/* Board Dimensions */}
-          <div className="p-4 rounded-xl bg-game-surface border border-game-border">
-            <h3 className="text-sm font-bold text-white mb-3 flex items-center justify-between">
+          <div className="p-4 rounded-2xl bg-white dark:bg-game-surface border border-slate-200 dark:border-game-border shadow-sm">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center justify-between">
               <span>Board Dimensions</span>
-              <span className="text-xs text-cyan-400 font-semibold">
+              <span className="text-xs text-cyan-600 dark:text-cyan-400 font-bold">
                 {cols} Columns × {rows} Rows
               </span>
             </h3>
@@ -340,10 +327,10 @@ export const SetupWizard: React.FC = () => {
                   setCols(7);
                   setRows(6);
                 }}
-                className={`py-1.5 px-2 rounded-lg text-xs font-bold border transition ${
+                className={`py-1.5 px-2 rounded-xl text-xs font-bold border transition ${
                   cols === 7 && rows === 6
-                    ? 'bg-cyan-500 text-slate-950 border-cyan-300'
-                    : 'bg-game-surfaceLight text-slate-400 border-slate-700/50 hover:bg-game-border'
+                    ? 'bg-cyan-500 text-slate-950 border-cyan-400'
+                    : 'bg-slate-50 dark:bg-game-surfaceLight text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-game-border'
                 }`}
               >
                 Classic 7×6
@@ -353,10 +340,10 @@ export const SetupWizard: React.FC = () => {
                   setCols(8);
                   setRows(7);
                 }}
-                className={`py-1.5 px-2 rounded-lg text-xs font-bold border transition ${
+                className={`py-1.5 px-2 rounded-xl text-xs font-bold border transition ${
                   cols === 8 && rows === 7
-                    ? 'bg-cyan-500 text-slate-950 border-cyan-300'
-                    : 'bg-game-surfaceLight text-slate-400 border-slate-700/50 hover:bg-game-border'
+                    ? 'bg-cyan-500 text-slate-950 border-cyan-400'
+                    : 'bg-slate-50 dark:bg-game-surfaceLight text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-game-border'
                 }`}
               >
                 Wide 8×7
@@ -366,10 +353,10 @@ export const SetupWizard: React.FC = () => {
                   setCols(9);
                   setRows(7);
                 }}
-                className={`py-1.5 px-2 rounded-lg text-xs font-bold border transition ${
+                className={`py-1.5 px-2 rounded-xl text-xs font-bold border transition ${
                   cols === 9 && rows === 7
-                    ? 'bg-cyan-500 text-slate-950 border-cyan-300'
-                    : 'bg-game-surfaceLight text-slate-400 border-slate-700/50 hover:bg-game-border'
+                    ? 'bg-cyan-500 text-slate-950 border-cyan-400'
+                    : 'bg-slate-50 dark:bg-game-surfaceLight text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-game-border'
                 }`}
               >
                 Grand 9×7
@@ -379,9 +366,9 @@ export const SetupWizard: React.FC = () => {
             {/* Custom Sliders */}
             <div className="flex flex-col gap-3">
               <div>
-                <div className="flex justify-between text-xs text-slate-400 mb-1">
+                <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400 mb-1">
                   <span>Columns ({MIN_COLS}–{MAX_COLS})</span>
-                  <span className="font-bold text-white">{cols}</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{cols}</span>
                 </div>
                 <input
                   type="range"
@@ -394,9 +381,9 @@ export const SetupWizard: React.FC = () => {
               </div>
 
               <div>
-                <div className="flex justify-between text-xs text-slate-400 mb-1">
+                <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400 mb-1">
                   <span>Rows ({MIN_ROWS}–{MAX_ROWS})</span>
-                  <span className="font-bold text-white">{rows}</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{rows}</span>
                 </div>
                 <input
                   type="range"
@@ -409,14 +396,14 @@ export const SetupWizard: React.FC = () => {
               </div>
             </div>
 
-            <p className="text-[11px] text-slate-400 mt-3">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-3">
               Rule Note: The winning target is <strong>always 4</strong> connected coins horizontally, vertically, or diagonally.
             </p>
           </div>
 
           {/* Turn Timer */}
-          <div className="p-4 rounded-xl bg-game-surface border border-game-border">
-            <h3 className="text-sm font-bold text-white mb-2">Turn Countdown</h3>
+          <div className="p-4 rounded-2xl bg-white dark:bg-game-surface border border-slate-200 dark:border-game-border shadow-sm">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2">Turn Countdown</h3>
             <div className="grid grid-cols-4 gap-2">
               {[
                 { label: 'None', val: 0 },
@@ -427,10 +414,10 @@ export const SetupWizard: React.FC = () => {
                 <button
                   key={val}
                   onClick={() => setTurnTimeout(val)}
-                  className={`py-1.5 text-xs font-bold rounded-lg border transition ${
+                  className={`py-1.5 text-xs font-bold rounded-xl border transition ${
                     turnTimeout === val
-                      ? 'bg-amber-500 text-slate-950 border-amber-300'
-                      : 'bg-game-surfaceLight text-slate-400 border-slate-700/50 hover:bg-game-border'
+                      ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                      : 'bg-slate-50 dark:bg-game-surfaceLight text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-game-border'
                   }`}
                 >
                   {label}
@@ -441,10 +428,10 @@ export const SetupWizard: React.FC = () => {
 
           {/* Pass & Play Handoff Privacy Screen */}
           {selectedMode === 'local' && (
-            <div className="p-4 rounded-xl bg-game-surface border border-game-border flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-white dark:bg-game-surface border border-slate-200 dark:border-game-border flex items-center justify-between shadow-sm">
               <div>
-                <h4 className="text-sm font-bold text-white">Privacy Handoff Screen</h4>
-                <p className="text-xs text-slate-400">
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">Privacy Handoff Screen</h4>
+                <p className="text-xs text-slate-600 dark:text-slate-400">
                   Hides the board between turns until the next player taps.
                 </p>
               </div>
@@ -460,7 +447,7 @@ export const SetupWizard: React.FC = () => {
           {/* Start Match CTA */}
           <button
             onClick={handleStartGame}
-            className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 via-sky-500 to-fuchsia-500 hover:from-cyan-400 hover:to-fuchsia-400 text-white font-extrabold text-base shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 active:scale-[0.98] transition cursor-pointer"
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-500 via-sky-500 to-fuchsia-500 hover:from-cyan-400 hover:to-fuchsia-400 text-white font-black text-base shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 active:scale-[0.98] transition cursor-pointer"
           >
             <Play className="w-5 h-5 fill-current" />
             START MATCH

@@ -8,9 +8,11 @@ import {
   MicOff,
   PhoneCall,
   PhoneOff,
+  Sparkles,
   Video,
 } from 'lucide-react';
 import { Room } from 'livekit-client';
+import { sound } from '../../utils/audio';
 
 interface CallPanelProps {
   roomCode: string;
@@ -18,13 +20,13 @@ interface CallPanelProps {
 }
 
 export const CallPanel: React.FC<CallPanelProps> = ({ roomCode, playerName }) => {
+  const [isCalling, setIsCalling] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isConfigured, setIsConfigured] = useState<boolean>(true);
+  const [callDuration, setCallDuration] = useState(0);
 
   // Local media stream ref for video display
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -33,70 +35,89 @@ export const CallPanel: React.FC<CallPanelProps> = ({ roomCode, playerName }) =>
 
   const livekitUrl = import.meta.env.VITE_LIVEKIT_URL;
 
-  // Handle Join Call
-  const handleJoinCall = async () => {
-    setIsConnecting(true);
-    setErrorMessage(null);
+  // Live Call Timer
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval>;
+    if (isConnected) {
+      timer = setInterval(() => {
+        setCallDuration((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setCallDuration(0);
+    }
+    return () => clearInterval(timer);
+  }, [isConnected]);
 
-    // If livekit URL is not provided in env, provide real-time browser MediaStream fallback so users can still test voice/camera!
-    if (!livekitUrl) {
-      setIsConfigured(false);
+  // Format call duration mm:ss
+  const formatDuration = (totalSec: number) => {
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Handle Join Call with Ringing Sound and Calling Animation
+  const handleJoinCall = async () => {
+    setIsCalling(true);
+    setErrorMessage(null);
+    sound.playRinging();
+
+    // Subtle 1.8s realistic connection delay so players experience the call effect
+    setTimeout(async () => {
       try {
-        // Request user media for real camera/mic verification
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: true,
-        });
-        localStreamRef.current = stream;
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
+        if (!livekitUrl) {
+          // Direct browser MediaStream fallback with full video/audio
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: true,
+          });
+          localStreamRef.current = stream;
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = stream;
+          }
+          sound.playCallConnected();
+          setIsConnected(true);
+          setIsVideoEnabled(true);
+        } else {
+          const room = new Room({
+            adaptiveStream: true,
+            dynacast: true,
+          });
+          roomRef.current = room;
+
+          const tokenRes = await fetch(
+            `/api/livekit-token?room=${roomCode}&username=${encodeURIComponent(playerName)}`
+          );
+          if (!tokenRes.ok) throw new Error('Token endpoint unavailable.');
+          const { token } = await tokenRes.json();
+
+          await room.connect(livekitUrl, token);
+          await room.localParticipant.enableCameraAndMicrophone();
+
+          sound.playCallConnected();
+          setIsConnected(true);
+          setIsVideoEnabled(true);
         }
-        setIsConnected(true);
-        setIsVideoEnabled(true);
       } catch (err: any) {
+        sound.stopRinging();
         setErrorMessage(
           err.name === 'NotAllowedError'
-            ? 'Camera / Microphone permission denied. Please allow device access in browser settings.'
+            ? 'Camera / Microphone permission denied. Please allow device access.'
             : 'Could not access audio/video devices.'
         );
       } finally {
-        setIsConnecting(false);
+        setIsCalling(false);
       }
-      return;
-    }
-
-    try {
-      const room = new Room({
-        adaptiveStream: true,
-        dynacast: true,
-      });
-      roomRef.current = room;
-
-      // Connect to token endpoint (in production server-side edge function)
-      const tokenRes = await fetch(`/api/livekit-token?room=${roomCode}&username=${encodeURIComponent(playerName)}`);
-      if (!tokenRes.ok) {
-        throw new Error('Token endpoint unavailable.');
-      }
-      const { token } = await tokenRes.json();
-
-      await room.connect(livekitUrl, token);
-      await room.localParticipant.enableCameraAndMicrophone();
-
-      setIsConnected(true);
-      setIsVideoEnabled(true);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to connect to LiveKit server.');
-    } finally {
-      setIsConnecting(false);
-    }
+    }, 1800);
   };
 
   // Toggle Mic
   const toggleMic = () => {
     if (localStreamRef.current) {
       const audioTracks = localStreamRef.current.getAudioTracks();
-      audioTracks.forEach((t) => (t.enabled = isMuted));
-      setIsMuted(!isMuted);
+      const willMute = !isMuted;
+      audioTracks.forEach((t) => (t.enabled = !willMute));
+      setIsMuted(willMute);
+      sound.playMicToggle(willMute);
     }
   };
 
@@ -104,13 +125,15 @@ export const CallPanel: React.FC<CallPanelProps> = ({ roomCode, playerName }) =>
   const toggleCamera = () => {
     if (localStreamRef.current) {
       const videoTracks = localStreamRef.current.getVideoTracks();
-      videoTracks.forEach((t) => (t.enabled = !isVideoEnabled));
-      setIsVideoEnabled(!isVideoEnabled);
+      const nextState = !isVideoEnabled;
+      videoTracks.forEach((t) => (t.enabled = nextState));
+      setIsVideoEnabled(nextState);
     }
   };
 
   // Leave Call
   const handleLeaveCall = () => {
+    sound.playCallEnded();
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
@@ -119,6 +142,7 @@ export const CallPanel: React.FC<CallPanelProps> = ({ roomCode, playerName }) =>
       roomRef.current.disconnect();
       roomRef.current = null;
     }
+    setIsCalling(false);
     setIsConnected(false);
     setIsVideoEnabled(false);
     setIsMuted(false);
@@ -126,6 +150,7 @@ export const CallPanel: React.FC<CallPanelProps> = ({ roomCode, playerName }) =>
 
   useEffect(() => {
     return () => {
+      sound.stopRinging();
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((t) => t.stop());
       }
@@ -135,58 +160,97 @@ export const CallPanel: React.FC<CallPanelProps> = ({ roomCode, playerName }) =>
     };
   }, []);
 
-  if (!isConnected) {
+  // DIALING / CALLING STATE
+  if (isCalling) {
     return (
-      <div className="w-full p-3 rounded-2xl bg-game-surface border border-game-border flex items-center justify-between shadow-lg">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-            <Video className="w-4 h-4" />
+      <div className="w-full p-4 rounded-3xl bg-gradient-to-r from-cyan-900/30 via-fuchsia-900/20 to-blue-950/40 border-2 border-cyan-400/60 p-4 shadow-2xl flex items-center justify-between animate-pulse">
+        <div className="flex items-center gap-3">
+          {/* Radar Ringing Pulse Avatar */}
+          <div className="relative flex items-center justify-center">
+            <span className="absolute w-12 h-12 rounded-full bg-cyan-400/30 animate-ping" />
+            <span className="w-10 h-10 rounded-2xl bg-cyan-500 text-slate-950 flex items-center justify-center shadow-lg relative z-10">
+              <PhoneCall className="w-5 h-5 animate-bounce" />
+            </span>
           </div>
+
           <div>
-            <h4 className="text-xs font-bold text-white">Match Voice & Video</h4>
-            <p className="text-[11px] text-slate-400">Optional live call during this room match</p>
+            <h4 className="text-sm font-black text-white flex items-center gap-2">
+              <span>Calling Room ({roomCode})...</span>
+              <Sparkles className="w-3.5 h-3.5 text-cyan-300 animate-spin" />
+            </h4>
+            <p className="text-xs text-cyan-200">Connecting audio and video channels</p>
           </div>
         </div>
 
         <button
-          onClick={handleJoinCall}
-          disabled={isConnecting}
-          className="py-2 px-3.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-cyan-500/20 disabled:opacity-50"
+          onClick={handleLeaveCall}
+          className="py-1.5 px-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs"
         >
-          <PhoneCall className="w-3.5 h-3.5" />
-          {isConnecting ? 'Connecting...' : 'Join Call'}
+          Cancel
         </button>
       </div>
     );
   }
 
+  // NOT CONNECTED STATE
+  if (!isConnected) {
+    return (
+      <div className="w-full p-3.5 rounded-3xl bg-white dark:bg-game-surface border border-slate-200 dark:border-game-border flex items-center justify-between shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-500 dark:text-cyan-400">
+            <Video className="w-4 h-4" />
+          </div>
+          <div>
+            <h4 className="text-xs font-black text-slate-900 dark:text-white">Match Voice & Video</h4>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">Optional live call during this room match</p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleJoinCall}
+          className="py-2 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs flex items-center gap-2 transition active:scale-95 shadow-md shadow-cyan-500/20"
+        >
+          <PhoneCall className="w-3.5 h-3.5" />
+          Join Call
+        </button>
+      </div>
+    );
+  }
+
+  // LIVE CONNECTED CALL STATE WITH EQUALIZER & LIVE VIDEO
   return (
-    <div className="w-full rounded-2xl bg-game-surface border-2 border-cyan-500/40 p-3.5 shadow-2xl flex flex-col gap-3 transition-all animate-fade-in">
+    <div className="w-full rounded-3xl bg-white dark:bg-game-surface border-2 border-cyan-500/60 p-4 shadow-2xl flex flex-col gap-3 transition-all animate-fade-in">
       {/* Call Header */}
-      <div className="flex items-center justify-between pb-2 border-b border-game-border">
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs font-bold text-white flex items-center gap-1">
-            Live Call <span className="text-slate-400">({roomCode})</span>
-          </span>
-          {!isConfigured && (
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300">
-              Browser Direct
+      <div className="flex items-center justify-between pb-2.5 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-slate-900 dark:text-white">Live Call</span>
+            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/30">
+              {formatDuration(callDuration)}
             </span>
-          )}
+          </div>
+
+          {/* Equalizer Sound Wave Animation */}
+          <div className="flex items-center gap-0.5 h-4 ml-1">
+            <span className="w-1 bg-emerald-400 rounded-full animate-pulse h-2" />
+            <span className="w-1 bg-emerald-400 rounded-full animate-pulse h-4" style={{ animationDelay: '0.15s' }} />
+            <span className="w-1 bg-emerald-400 rounded-full animate-pulse h-3" style={{ animationDelay: '0.3s' }} />
+            <span className="w-1 bg-emerald-400 rounded-full animate-pulse h-1.5" style={{ animationDelay: '0.45s' }} />
+          </div>
         </div>
 
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setIsMinimized(!isMinimized)}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-game-surfaceLight transition"
+            className="p-1.5 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-game-surfaceLight transition"
             title={isMinimized ? 'Expand call view' : 'Minimize call view'}
           >
             {isMinimized ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
           </button>
           <button
             onClick={handleLeaveCall}
-            className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/20 transition"
+            className="p-1.5 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/20 transition"
             title="Leave call"
           >
             <PhoneOff className="w-4 h-4" />
@@ -195,14 +259,14 @@ export const CallPanel: React.FC<CallPanelProps> = ({ roomCode, playerName }) =>
       </div>
 
       {errorMessage && (
-        <div className="p-2 rounded bg-red-500/15 border border-red-500/40 text-red-300 text-[11px]">
+        <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/40 text-red-700 dark:text-red-300 text-xs">
           {errorMessage}
         </div>
       )}
 
       {/* Video Tile (Hidden if minimized) */}
       {!isMinimized && (
-        <div className="relative aspect-video max-h-40 rounded-xl bg-slate-950 overflow-hidden border border-game-border flex items-center justify-center">
+        <div className="relative aspect-video max-h-48 rounded-2xl bg-slate-950 overflow-hidden border-2 border-slate-800 shadow-inner flex items-center justify-center group">
           <video
             ref={localVideoRef}
             autoPlay
@@ -211,16 +275,22 @@ export const CallPanel: React.FC<CallPanelProps> = ({ roomCode, playerName }) =>
             className={`w-full h-full object-cover ${!isVideoEnabled ? 'hidden' : ''}`}
           />
           {!isVideoEnabled && (
-            <div className="flex flex-col items-center gap-1 text-slate-500 text-xs font-semibold">
-              <CameraOff className="w-6 h-6" />
-              <span>Camera Off</span>
+            <div className="flex flex-col items-center gap-1.5 text-slate-500 text-xs font-semibold">
+              <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-slate-400">
+                <CameraOff className="w-6 h-6" />
+              </div>
+              <span>Camera Paused</span>
             </div>
           )}
 
-          {/* Participant Label */}
-          <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/60 backdrop-blur-sm text-[10px] font-bold text-white flex items-center gap-1">
+          {/* Participant Label & Voice Indicator */}
+          <div className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-xl bg-black/60 backdrop-blur-md text-[11px] font-bold text-white flex items-center gap-1.5 shadow-md">
             <span>{playerName} (You)</span>
-            {isMuted && <MicOff className="w-3 h-3 text-red-400" />}
+            {isMuted ? (
+              <MicOff className="w-3.5 h-3.5 text-red-400" />
+            ) : (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            )}
           </div>
         </div>
       )}
@@ -231,38 +301,38 @@ export const CallPanel: React.FC<CallPanelProps> = ({ roomCode, playerName }) =>
           {/* Mute/Unmute */}
           <button
             onClick={toggleMic}
-            className={`p-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+            className={`py-2 px-3.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
               isMuted
-                ? 'bg-red-500/20 text-red-400 border border-red-500/40'
-                : 'bg-game-surfaceLight text-slate-200 hover:text-white border border-slate-700/60'
+                ? 'bg-red-50 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/40 shadow-sm'
+                : 'bg-slate-100 dark:bg-game-surfaceLight text-slate-800 dark:text-slate-200 hover:text-cyan-500 border border-slate-200 dark:border-slate-700/60'
             }`}
             title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
           >
-            {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4 text-cyan-400" />}
-            <span className="hidden sm:inline">{isMuted ? 'Muted' : 'Mute'}</span>
+            {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4 text-cyan-500" />}
+            <span>{isMuted ? 'Muted' : 'Mute'}</span>
           </button>
 
           {/* Camera On/Off */}
           <button
             onClick={toggleCamera}
-            className={`p-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+            className={`py-2 px-3.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
               !isVideoEnabled
-                ? 'bg-slate-800 text-slate-400 border border-slate-700'
-                : 'bg-game-surfaceLight text-slate-200 hover:text-white border border-slate-700/60'
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700'
+                : 'bg-slate-100 dark:bg-game-surfaceLight text-slate-800 dark:text-slate-200 hover:text-emerald-500 border border-slate-200 dark:border-slate-700/60'
             }`}
             title={isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
           >
-            {isVideoEnabled ? <Camera className="w-4 h-4 text-emerald-400" /> : <CameraOff className="w-4 h-4" />}
-            <span className="hidden sm:inline">{isVideoEnabled ? 'Video On' : 'Video Off'}</span>
+            {isVideoEnabled ? <Camera className="w-4 h-4 text-emerald-500" /> : <CameraOff className="w-4 h-4" />}
+            <span>{isVideoEnabled ? 'Video On' : 'Video Off'}</span>
           </button>
         </div>
 
         <button
           onClick={handleLeaveCall}
-          className="py-1.5 px-3 rounded-xl bg-red-600/80 hover:bg-red-600 text-white font-bold text-xs flex items-center gap-1 transition"
+          className="py-2 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-red-600/20"
         >
           <PhoneOff className="w-3.5 h-3.5" />
-          Leave
+          End Call
         </button>
       </div>
     </div>

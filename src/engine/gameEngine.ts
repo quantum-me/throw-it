@@ -18,6 +18,25 @@ export const DEFAULT_PALETTE = [
   '#8b5cf6', // Purple
 ];
 
+export const COLOR_PRESETS = [
+  '#06b6d4', // Neon Cyan
+  '#f43f5e', // Hot Coral
+  '#eab308', // Radiant Gold
+  '#d946ef', // Electric Magenta
+  '#84cc16', // Toxic Lime
+  '#f97316', // Sunset Orange
+  '#8b5cf6', // Deep Purple
+  '#38bdf8', // Sky Blue
+  '#10b981', // Emerald Green
+  '#ec4899', // Hot Pink
+  '#14b8a6', // Bright Teal
+  '#6366f1', // Royal Indigo
+  '#ef4444', // Ruby Crimson
+  '#f59e0b', // Warm Amber
+  '#a855f7', // Bright Violet
+  '#22c55e', // Mint Green
+];
+
 export const DEFAULT_SYMBOLS = ['●', '▲', '★', '■', '◆', '✦', '⬟'];
 export const DEFAULT_AVATARS = ['crown', 'bot', 'flame', 'zap', 'star', 'shield', 'heart'];
 

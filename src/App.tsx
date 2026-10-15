@@ -20,7 +20,7 @@ const GameContainer: React.FC = () => {
   const playerName = localStorage.getItem('throw_it_player_name') || 'Player';
 
   return (
-    <div className="min-h-screen flex flex-col bg-game-dark text-slate-100 transition-colors">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 transition-colors duration-300">
       <Navbar />
 
       <main className="flex-1 flex flex-col items-center justify-center w-full">

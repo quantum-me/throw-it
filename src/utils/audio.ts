@@ -229,6 +229,142 @@ class SoundEngine {
       // Audio playback failsafe
     }
   }
+
+  // --- Voice / Video Call Effects ---
+
+  private ringInterval: ReturnType<typeof setInterval> | null = null;
+
+  public playRinging() {
+    if (!this.enabled) return;
+    this.stopRinging();
+
+    const triggerRingPulse = () => {
+      const ctx = this.initContext();
+      if (!ctx) return;
+      try {
+        const now = ctx.currentTime;
+        // Standard US/international telephone ringing frequencies: 440Hz and 480Hz
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(440, now);
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(480, now);
+
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.setValueAtTime(0.08, now + 0.8);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.9);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.95);
+        osc2.stop(now + 0.95);
+      } catch {
+        // Audio failsafe
+      }
+    };
+
+    triggerRingPulse();
+    this.ringInterval = setInterval(triggerRingPulse, 2200);
+  }
+
+  public stopRinging() {
+    if (this.ringInterval) {
+      clearInterval(this.ringInterval);
+      this.ringInterval = null;
+    }
+  }
+
+  public playCallConnected() {
+    this.stopRinging();
+    if (!this.enabled) return;
+    const ctx = this.initContext();
+    if (!ctx) return;
+
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, now); // C5
+      osc.frequency.setValueAtTime(783.99, now + 0.12); // G5
+
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.4);
+    } catch {
+      // Audio failsafe
+    }
+  }
+
+  public playCallEnded() {
+    this.stopRinging();
+    if (!this.enabled) return;
+    const ctx = this.initContext();
+    if (!ctx) return;
+
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.setValueAtTime(329.63, now + 0.12);
+      osc.frequency.setValueAtTime(220, now + 0.24);
+
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.5);
+    } catch {
+      // Audio failsafe
+    }
+  }
+
+  public playMicToggle(isMuting: boolean) {
+    if (!this.enabled) return;
+    const ctx = this.initContext();
+    if (!ctx) return;
+
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(isMuting ? 350 : 600, now);
+      osc.frequency.setValueAtTime(isMuting ? 200 : 750, now + 0.05);
+
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.1);
+    } catch {
+      // Audio failsafe
+    }
+  }
 }
 
 export const sound = new SoundEngine();
+

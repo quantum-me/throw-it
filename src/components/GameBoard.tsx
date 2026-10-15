@@ -99,7 +99,7 @@ export const GameBoard: React.FC = () => {
       </div>
 
       {/* Main Board Rack Container */}
-      <div className="relative p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-[#141b34] dark:bg-[#0c1224] border-4 border-[#22305c] dark:border-[#1a2548] shadow-2xl board-grid-shadow w-full max-w-[620px] transition-all">
+      <div className="relative p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-blue-600 dark:bg-[#0c1224] border-4 border-blue-700 dark:border-[#1a2548] shadow-2xl board-grid-shadow w-full max-w-[620px] transition-all">
         {/* The Grid of Slots */}
         <div
           className="grid gap-1.5 sm:gap-2.5"
@@ -117,7 +117,7 @@ export const GameBoard: React.FC = () => {
               onMouseLeave={() => setHoveredCol(null)}
               className={`flex flex-col gap-1.5 sm:gap-2.5 cursor-pointer rounded-xl p-0.5 sm:p-1 transition-colors ${
                 hoveredCol === c && !isInputLocked && isValidMove(board, c)
-                  ? 'bg-white/5 ring-1 ring-cyan-400/40'
+                  ? 'bg-white/10 ring-1 ring-cyan-400/60'
                   : ''
               }`}
             >
@@ -129,7 +129,7 @@ export const GameBoard: React.FC = () => {
                 return (
                   <div
                     key={`cell-${r}-${c}`}
-                    className="aspect-square rounded-full bg-[#0a0d17] dark:bg-[#060810] border border-blue-900/60 p-0.5 sm:p-1 flex items-center justify-center board-cell-hole relative overflow-hidden"
+                    className="aspect-square rounded-full bg-blue-950/95 dark:bg-[#060810] border border-blue-800/80 dark:border-blue-900/60 p-0.5 sm:p-1 flex items-center justify-center board-cell-hole relative overflow-hidden shadow-inner"
                   >
                     {player && (
                       <div

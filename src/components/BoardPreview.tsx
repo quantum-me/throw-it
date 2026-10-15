@@ -6,7 +6,7 @@ export const BoardPreview: React.FC = () => {
 
   const previewCols = 7;
 
-  // Colors: 1 = Cyan, 2 = Magenta, 3 = Yellow
+  // Colors: Cyan, Coral, Yellow
   const grid = [
     [null, null, null, null, null, null, null],
     [null, null, null, null, null, null, null],
@@ -32,28 +32,28 @@ export const BoardPreview: React.FC = () => {
   }, []);
 
   return (
-    <div className="relative mx-auto max-w-sm sm:max-w-md p-4 bg-gradient-to-b from-game-surface/90 to-game-darker/90 rounded-2xl border border-game-border shadow-2xl board-grid-shadow">
+    <div className="relative mx-auto max-w-sm sm:max-w-md p-4 bg-white/95 dark:bg-[#151b2d]/90 rounded-3xl border border-slate-200 dark:border-game-border shadow-2xl board-grid-shadow transition-colors">
       {/* Top Slot Header */}
       <div className="flex justify-around mb-2 px-2">
         {Array.from({ length: previewCols }).map((_, c) => (
           <div
             key={c}
             className={`w-3 h-3 rounded-full transition-opacity ${
-              c === 3 ? 'bg-cyan-400 opacity-90 animate-bounce' : 'bg-slate-700/40 opacity-40'
+              c === 3 ? 'bg-cyan-500 opacity-90 animate-bounce' : 'bg-slate-300 dark:bg-slate-700/40 opacity-40'
             }`}
           />
         ))}
       </div>
 
       {/* Board Rack Grid */}
-      <div className="bg-blue-950/80 dark:bg-[#131b34] p-3 rounded-xl border border-blue-800/40 grid grid-cols-7 gap-2 shadow-inner">
+      <div className="bg-blue-600 dark:bg-[#131b34] p-3 rounded-2xl border-2 border-blue-700 dark:border-blue-800/40 grid grid-cols-7 gap-2 shadow-inner">
         {grid.map((row, r) =>
           row.map((cellColor, c) => {
             const isWin = winCells.some(([wr, wc]) => wr === r && wc === c);
             return (
               <div
                 key={`${r}-${c}`}
-                className="aspect-square rounded-full bg-slate-900/90 dark:bg-[#090d1a] border border-blue-900/60 p-1 flex items-center justify-center board-cell-hole relative overflow-hidden"
+                className="aspect-square rounded-full bg-blue-950/95 dark:bg-[#090d1a] border border-blue-900/60 p-1 flex items-center justify-center board-cell-hole relative overflow-hidden shadow-inner"
               >
                 {cellColor && (
                   <div
@@ -76,12 +76,12 @@ export const BoardPreview: React.FC = () => {
         )}
       </div>
 
-      <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400 font-medium px-2">
+      <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-semibold px-2">
         <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping inline-block" />
+          <span className="w-2 h-2 rounded-full bg-cyan-500 animate-ping inline-block" />
           4 in a row to win
         </span>
-        <span className="text-cyan-400 font-semibold">T! Interactive Strategy</span>
+        <span className="text-cyan-600 dark:text-cyan-400 font-bold">T! Interactive Strategy</span>
       </div>
     </div>
   );
