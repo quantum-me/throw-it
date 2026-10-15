@@ -167,23 +167,17 @@ export const CallPanel: React.FC<CallPanelProps> = ({ roomCode, playerName }) =>
   const opponentPlayer = activeRoom?.players.find((p) => p.id !== localPlayerId);
 
   // START CALL (Caller initiates)
-  const handleStartCall = async () => {
+  const handleStartCall = () => {
     sound.playRinging();
     setCallState('dialing');
     setStatusNotice(null);
-
-    const stream = await acquireMediaStream();
-    localStreamRef.current = stream;
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream;
-    }
 
     const hostOrOpponent = opponentPlayer?.name || 'Opponent';
     setRemotePeerName(hostOrOpponent);
     if (opponentPlayer?.avatar) setRemotePeerAvatar(opponentPlayer.avatar);
     if (opponentPlayer?.color) setRemotePeerColor(opponentPlayer.color);
 
-    // Broadcast CALL_INVITE across all room transports
+    // ⚡ INSTANT DISPATCH: Broadcast CALL_INVITE immediately (0ms delay)
     onlineManager.sendCallSignal({
       type: 'CALL_INVITE',
       callerId: localPlayerId,
@@ -192,30 +186,45 @@ export const CallPanel: React.FC<CallPanelProps> = ({ roomCode, playerName }) =>
       callerColor: activeRoom?.players.find((p) => p.id === localPlayerId)?.color || '#06b6d4',
       roomCode,
     });
+
+    // Concurrently acquire local media stream in background (non-blocking)
+    acquireMediaStream().then((stream) => {
+      localStreamRef.current = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+    }).catch(() => {
+      // Stream error handled gracefully
+    });
   };
 
   // LIFT / ANSWER CALL (Recipient accepts)
-  const handleLiftCall = async () => {
+  const handleLiftCall = () => {
     if (!incomingCall) return;
 
     sound.stopRinging();
     sound.playCallConnected();
+    const callerId = incomingCall.callerId;
     setIncomingCall(null);
     setCallState('connected');
 
-    const stream = await acquireMediaStream();
-    localStreamRef.current = stream;
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream;
-    }
-
-    // Broadcast CALL_ACCEPTED back to caller
+    // ⚡ INSTANT DISPATCH: Broadcast CALL_ACCEPTED immediately (0ms delay)
     onlineManager.sendCallSignal({
       type: 'CALL_ACCEPTED',
-      callerId: incomingCall.callerId,
+      callerId,
       answererId: localPlayerId,
       answererName: playerName,
       roomCode,
+    });
+
+    // Concurrently acquire recipient's media stream in background (non-blocking)
+    acquireMediaStream().then((stream) => {
+      localStreamRef.current = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+    }).catch(() => {
+      // Stream error handled gracefully
     });
   };
 

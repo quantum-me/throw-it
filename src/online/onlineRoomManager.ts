@@ -66,6 +66,23 @@ class OnlineRoomManager {
   private guestConnections: Map<string, DataConnection> = new Map();
   private hostConnection: DataConnection | null = null;
 
+  constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'throw_it_call_signal' && e.newValue) {
+          try {
+            const parsed = JSON.parse(e.newValue);
+            if (parsed?.signal) {
+              this.notifyCallSignal(parsed.signal);
+            }
+          } catch {
+            // Ignore
+          }
+        }
+      });
+    }
+  }
+
   public subscribe(cb: RoomEventCallback): () => void {
     this.listeners.add(cb);
     if (this.activeRoom) cb(this.activeRoom);
@@ -82,7 +99,17 @@ class OnlineRoomManager {
   }
 
   public sendCallSignal(event: CallSignalEvent) {
-    // 1. BroadcastChannel
+    // 1. Instant cross-tab storage dispatch (fires storage event across all tabs with 0ms latency)
+    try {
+      localStorage.setItem(
+        'throw_it_call_signal',
+        JSON.stringify({ signal: event, t: Date.now(), r: Math.random() })
+      );
+    } catch {
+      // Ignore
+    }
+
+    // 2. BroadcastChannel (local tabs/windows)
     if (this.broadcastChannel) {
       try {
         this.broadcastChannel.postMessage({ type: 'CALL_SIGNAL', signal: event });
@@ -91,7 +118,7 @@ class OnlineRoomManager {
       }
     }
 
-    // 2. PeerJS DataConnections (to all guests if host)
+    // 3. PeerJS DataConnections (to all guests if host)
     this.guestConnections.forEach((conn) => {
       if (conn.open) {
         try {
@@ -102,7 +129,7 @@ class OnlineRoomManager {
       }
     });
 
-    // 3. Host connection (if guest)
+    // 4. Host connection (if guest)
     if (this.hostConnection && this.hostConnection.open) {
       try {
         this.hostConnection.send({ type: 'CALL_SIGNAL', signal: event });
