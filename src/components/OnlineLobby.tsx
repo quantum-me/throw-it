@@ -24,6 +24,7 @@ import type { OnlineRoom } from '../online/onlineRoomManager';
 import { isSupabaseConfigured } from '../online/supabaseClient';
 import { ColorPalettePicker } from './ColorPalettePicker';
 import { AvatarIcon } from './SetupWizard';
+import { CallPanel } from './call/CallPanel';
 
 export const OnlineLobby: React.FC = () => {
   const { setView, setGameState } = useGame();
@@ -298,6 +299,13 @@ export const OnlineLobby: React.FC = () => {
               })}
             </div>
           </div>
+
+          {/* Match Voice & Video in Lobby */}
+          {canStart && (
+            <div className="pt-1">
+              <CallPanel roomCode={currentRoom.code} playerName={playerName} />
+            </div>
+          )}
 
           {/* Lobby Actions */}
           <div className="pt-2 flex flex-col gap-2.5">

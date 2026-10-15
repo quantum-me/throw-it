@@ -12,10 +12,18 @@ import { WinModal } from './components/WinModal';
 import { CallPanel } from './components/call/CallPanel';
 import { GameProvider, useGame } from './context/GameContext';
 import { onlineManager } from './online/onlineRoomManager';
+import type { OnlineRoom } from './online/onlineRoomManager';
 
 const GameContainer: React.FC = () => {
   const { view, gameState } = useGame();
-  const onlineRoom = onlineManager.getActiveRoom();
+  const [onlineRoom, setOnlineRoom] = React.useState<OnlineRoom | null>(() => onlineManager.getActiveRoom());
+
+  React.useEffect(() => {
+    const unsubscribe = onlineManager.subscribe((room) => {
+      setOnlineRoom({ ...room });
+    });
+    return unsubscribe;
+  }, []);
 
   const playerName = localStorage.getItem('throw_it_player_name') || 'Player';
 

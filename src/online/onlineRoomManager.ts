@@ -27,6 +27,19 @@ export interface LastMoveEvent {
   isDraw: boolean;
 }
 
+export interface CallSignalEvent {
+  type: 'CALL_INVITE' | 'CALL_ACCEPTED' | 'CALL_DECLINED' | 'CALL_CANCELLED' | 'CALL_ENDED';
+  callerId?: string;
+  callerName?: string;
+  callerAvatar?: string;
+  callerColor?: string;
+  answererId?: string;
+  answererName?: string;
+  roomCode?: string;
+}
+
+export type CallSignalCallback = (event: CallSignalEvent) => void;
+
 export type RoomEventCallback = (room: OnlineRoom, lastMove?: LastMoveEvent) => void;
 
 /**
@@ -46,6 +59,7 @@ export function getLocalPlayerId(): string {
 class OnlineRoomManager {
   private activeRoom: OnlineRoom | null = null;
   private listeners: Set<RoomEventCallback> = new Set();
+  private callListeners: Set<CallSignalCallback> = new Set();
   private broadcastChannel: BroadcastChannel | null = null;
   private supabaseChannel: any = null;
   private peer: Peer | null = null;
@@ -56,6 +70,54 @@ class OnlineRoomManager {
     this.listeners.add(cb);
     if (this.activeRoom) cb(this.activeRoom);
     return () => this.listeners.delete(cb);
+  }
+
+  public subscribeCall(cb: CallSignalCallback): () => void {
+    this.callListeners.add(cb);
+    return () => this.callListeners.delete(cb);
+  }
+
+  public notifyCallSignal(event: CallSignalEvent) {
+    this.callListeners.forEach((cb) => cb(event));
+  }
+
+  public sendCallSignal(event: CallSignalEvent) {
+    // 1. BroadcastChannel
+    if (this.broadcastChannel) {
+      try {
+        this.broadcastChannel.postMessage({ type: 'CALL_SIGNAL', signal: event });
+      } catch (err) {
+        console.warn('BroadcastChannel call signal error:', err);
+      }
+    }
+
+    // 2. PeerJS DataConnections (to all guests if host)
+    this.guestConnections.forEach((conn) => {
+      if (conn.open) {
+        try {
+          conn.send({ type: 'CALL_SIGNAL', signal: event });
+        } catch (err) {
+          console.warn('PeerJS call signal error:', err);
+        }
+      }
+    });
+
+    // 3. Host connection (if guest)
+    if (this.hostConnection && this.hostConnection.open) {
+      try {
+        this.hostConnection.send({ type: 'CALL_SIGNAL', signal: event });
+      } catch (err) {
+        console.warn('Host connection call signal error:', err);
+      }
+    }
+  }
+
+  public getPeer(): Peer | null {
+    return this.peer;
+  }
+
+  public getHostPeerId(code: string): string {
+    return `throwit-${code.toLowerCase()}`;
   }
 
   private notify(lastMove?: LastMoveEvent) {
@@ -201,6 +263,8 @@ class OnlineRoomManager {
           }
         } else if (data.type === 'PLAYER_LEAVE' && data.playerId) {
           this.handlePlayerLeave(data.playerId);
+        } else if (data.type === 'CALL_SIGNAL' && data.signal) {
+          this.notifyCallSignal(data.signal);
         }
       };
     } catch (err) {
@@ -237,6 +301,18 @@ class OnlineRoomManager {
             }
           } else if (data.type === 'PLAYER_LEAVE' && data.playerId) {
             this.handlePlayerLeave(data.playerId);
+          } else if (data.type === 'CALL_SIGNAL' && data.signal) {
+            this.notifyCallSignal(data.signal);
+            // Relay to other guests
+            this.guestConnections.forEach((otherConn) => {
+              if (otherConn !== conn && otherConn.open) {
+                try {
+                  otherConn.send(data);
+                } catch {
+                  // Ignore
+                }
+              }
+            });
           }
         });
 
@@ -331,6 +407,8 @@ class OnlineRoomManager {
         if (data && (data.type === 'ROOM_SYNC' || data.type === 'GAME_START')) {
           this.activeRoom = data.room;
           this.notify(data.lastMove);
+        } else if (data?.type === 'CALL_SIGNAL' && data.signal) {
+          this.notifyCallSignal(data.signal);
         }
       };
     } catch (err) {
@@ -418,6 +496,8 @@ class OnlineRoomManager {
                 clearTimeout(timeout);
                 resolve(data.room);
               }
+            } else if (data?.type === 'CALL_SIGNAL' && data.signal) {
+              this.notifyCallSignal(data.signal);
             }
           });
 
@@ -467,6 +547,8 @@ class OnlineRoomManager {
             if (data?.type === 'ROOM_SYNC' || data?.type === 'GAME_START') {
               this.activeRoom = data.room;
               this.notify(data.lastMove);
+            } else if (data?.type === 'CALL_SIGNAL' && data.signal) {
+              this.notifyCallSignal(data.signal);
             }
           });
         });
