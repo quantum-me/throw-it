@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import type { Player } from '../engine/types';
+import { getLocalPlayerId } from '../online/onlineRoomManager';
 import { AvatarIcon } from './SetupWizard';
 
 export const PlayerPanel: React.FC = () => {
@@ -56,13 +57,18 @@ export const PlayerPanel: React.FC = () => {
       // Timeout auto-move / skip logic
       if (remaining === 0) {
         clearInterval(interval);
-        // Find first available column to prevent stall
+        // Only active player submits move on timeout
         if (gameState) {
-          const availableCols = gameState.board[0]
-            .map((c: string | null, idx: number) => (c === null ? idx : -1))
-            .filter((idx: number) => idx !== -1);
-          if (availableCols.length > 0) {
-            handleMakeMove(availableCols[0]);
+          const isOnline = gameState.mode === 'online';
+          const localId = getLocalPlayerId();
+          const currentTurnPlayer = gameState.players[gameState.currentTurnIndex];
+          if (!isOnline || currentTurnPlayer.id === localId) {
+            const availableCols = gameState.board[0]
+              .map((c: string | null, idx: number) => (c === null ? idx : -1))
+              .filter((idx: number) => idx !== -1);
+            if (availableCols.length > 0) {
+              handleMakeMove(availableCols[0]);
+            }
           }
         }
       }

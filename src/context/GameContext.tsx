@@ -7,6 +7,7 @@ import {
 } from '../engine/gameEngine';
 import { getRobotMove } from '../engine/robot';
 import type { GameConfig, GameMode, GameState, Player, RoboDifficulty } from '../engine/types';
+import { getLocalPlayerId, onlineManager } from '../online/onlineRoomManager';
 import { sound } from '../utils/audio';
 
 export type AppView = 'home' | 'setup_wizard' | 'game' | 'online_lobby';
@@ -176,9 +177,54 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, delay);
   };
 
+  // Subscribe to online room manager events for seamless global sync
+  useEffect(() => {
+    const unsubscribe = onlineManager.subscribe((room, lastMove) => {
+      if (room.status === 'playing' && room.gameState) {
+        setGameState(room.gameState);
+        setView('game');
+
+        if (lastMove) {
+          if (lastMove.isWin) {
+            sound.playVictory();
+          } else if (lastMove.isDraw) {
+            sound.playDraw();
+          } else {
+            sound.playCoinDrop();
+            sound.playTurnChange();
+          }
+        }
+      } else if (room.status === 'ended' && room.gameState) {
+        setGameState(room.gameState);
+        if (lastMove?.isWin) {
+          sound.playVictory();
+        } else if (lastMove?.isDraw) {
+          sound.playDraw();
+        }
+      }
+    });
+    return unsubscribe;
+  }, []);
+
   // Player coin drop
   const handleMakeMove = (col: number) => {
     if (!gameState || gameState.status !== 'playing' || isRobotThinking) return;
+
+    if (gameState.mode === 'online') {
+      const activePlayer = gameState.players[gameState.currentTurnIndex];
+      const localId = getLocalPlayerId();
+      if (activePlayer.id !== localId) {
+        sound.playInvalidMove();
+        return;
+      }
+
+      try {
+        onlineManager.submitMove(localId, col);
+      } catch {
+        sound.playInvalidMove();
+      }
+      return;
+    }
 
     const activePlayer = gameState.players[gameState.currentTurnIndex];
 
@@ -232,6 +278,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleRematch = () => {
     if (!gameState) return;
+
+    if (gameState.mode === 'online') {
+      onlineManager.triggerRematch();
+      return;
+    }
+
     const nextState = rematchState(gameState);
     setGameState(nextState);
 

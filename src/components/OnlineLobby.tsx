@@ -5,6 +5,7 @@ import {
   Copy,
   Crown,
   Globe,
+  Loader2,
   Play,
   Share2,
   Users,
@@ -18,7 +19,7 @@ import {
   DEFAULT_SYMBOLS,
 } from '../engine/gameEngine';
 import type { Player } from '../engine/types';
-import { onlineManager } from '../online/onlineRoomManager';
+import { getLocalPlayerId, onlineManager } from '../online/onlineRoomManager';
 import type { OnlineRoom } from '../online/onlineRoomManager';
 import { isSupabaseConfigured } from '../online/supabaseClient';
 import { ColorPalettePicker } from './ColorPalettePicker';
@@ -28,16 +29,19 @@ export const OnlineLobby: React.FC = () => {
   const { setView, setGameState } = useGame();
 
   const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
-  const [currentRoom, setCurrentRoom] = useState<OnlineRoom | null>(null);
+  const [currentRoom, setCurrentRoom] = useState<OnlineRoom | null>(() => onlineManager.getActiveRoom());
 
   // Player input info
+  const localPlayerId = React.useMemo(() => getLocalPlayerId(), []);
+
   const [playerName, setPlayerName] = useState<string>(() => {
-    return localStorage.getItem('throw_it_player_name') || 'Guest Player';
+    return localStorage.getItem('throw_it_player_name') || `Player ${Math.floor(Math.random() * 899 + 100)}`;
   });
   const [selectedColor, setSelectedColor] = useState<string>(DEFAULT_PALETTE[0]);
   const [selectedAvatar, setSelectedAvatar] = useState<string>('crown');
   const [joinCodeInput, setJoinCodeInput] = useState<string>('');
   const [isCopied, setIsCopied] = useState<boolean>(false);
+  const [isJoining, setIsJoining] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Check URL params for invite link (?room=CODE)
@@ -55,7 +59,7 @@ export const OnlineLobby: React.FC = () => {
   // Subscribe to online room manager events
   useEffect(() => {
     const unsubscribe = onlineManager.subscribe((room) => {
-      setCurrentRoom(room);
+      setCurrentRoom({ ...room });
       if (room.status === 'playing' && room.gameState) {
         setGameState(room.gameState);
         setView('game');
@@ -64,22 +68,13 @@ export const OnlineLobby: React.FC = () => {
     return unsubscribe;
   }, [setGameState, setView]);
 
-  const localPlayerId = React.useMemo(() => {
-    let id = localStorage.getItem('throw_it_local_player_id');
-    if (!id) {
-      id = `usr_${Math.random().toString(36).substring(2, 9)}`;
-      localStorage.setItem('throw_it_local_player_id', id);
-    }
-    return id;
-  }, []);
-
   const handleCreateRoom = async () => {
     setErrorMessage(null);
     try {
       localStorage.setItem('throw_it_player_name', playerName);
       const hostPlayer: Player = {
         id: localPlayerId,
-        name: playerName,
+        name: playerName.trim() || 'Host Player',
         color: selectedColor,
         symbol: DEFAULT_SYMBOLS[0],
         avatar: selectedAvatar,
@@ -90,26 +85,28 @@ export const OnlineLobby: React.FC = () => {
       const room = await onlineManager.createRoom(hostPlayer, {
         rows: DEFAULT_ROWS,
         cols: DEFAULT_COLS,
-        turnTimeoutSeconds: 30,
+        turnTimeoutSeconds: 0,
       });
-      setCurrentRoom(room);
+      setCurrentRoom({ ...room });
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to create room.');
     }
   };
 
   const handleJoinRoom = async () => {
-    if (!joinCodeInput.trim()) {
-      setErrorMessage('Please enter a valid 6-character room code.');
+    const code = joinCodeInput.trim().toUpperCase();
+    if (!code || code.length < 4) {
+      setErrorMessage('Please enter a valid room code (e.g. DROP7X).');
       return;
     }
     setErrorMessage(null);
+    setIsJoining(true);
 
     try {
       localStorage.setItem('throw_it_player_name', playerName);
       const joinPlayer: Player = {
         id: localPlayerId,
-        name: playerName,
+        name: playerName.trim() || 'Guest Player',
         color: selectedColor,
         symbol: DEFAULT_SYMBOLS[1],
         avatar: selectedAvatar,
@@ -117,17 +114,19 @@ export const OnlineLobby: React.FC = () => {
         isReady: true,
       };
 
-      const room = await onlineManager.joinRoom(joinCodeInput, joinPlayer);
-      setCurrentRoom(room);
+      const room = await onlineManager.joinRoom(code, joinPlayer);
+      setCurrentRoom({ ...room });
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to join room.');
+    } finally {
+      setIsJoining(false);
     }
   };
 
   const handleCopyInviteLink = () => {
     if (!currentRoom) return;
-    const url = `${window.location.origin}${window.location.pathname}?room=${currentRoom.code}`;
-    navigator.clipboard.writeText(url);
+    const cleanUrl = `${window.location.origin}${window.location.pathname}?room=${currentRoom.code}`;
+    navigator.clipboard.writeText(cleanUrl);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
@@ -141,6 +140,7 @@ export const OnlineLobby: React.FC = () => {
 
   const handleStartMatch = () => {
     if (!currentRoom) return;
+    setErrorMessage(null);
     try {
       onlineManager.startMatch(localPlayerId);
     } catch (err: any) {
@@ -157,7 +157,8 @@ export const OnlineLobby: React.FC = () => {
     }
   };
 
-  const isHost = currentRoom?.hostId === localPlayerId || currentRoom?.hostId === 'host_pending';
+  const isHost = currentRoom ? currentRoom.hostId === localPlayerId : false;
+  const canStart = currentRoom ? currentRoom.players.length >= 2 : false;
 
   return (
     <div className="flex-1 max-w-2xl mx-auto px-4 py-8 w-full flex flex-col justify-center">
@@ -176,28 +177,33 @@ export const OnlineLobby: React.FC = () => {
               Online Multiplayer Rooms
             </h2>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-              Create a match, share room code or link, and play in real-time.
+              Create a match, share room code or link, and battle live.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Backend Status Notice */}
-      {!isSupabaseConfigured && (
-        <div className="mb-4 p-3.5 rounded-2xl bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/60 text-cyan-900 dark:text-cyan-200 text-xs flex flex-col gap-1 shadow-sm">
-          <div className="flex items-center gap-2 font-bold text-cyan-700 dark:text-cyan-300">
-            <span className="w-2 h-2 rounded-full bg-cyan-500 animate-ping" />
-            Active Realtime Mode (Multi-Tab & LAN Peer Sync)
-          </div>
-          <p className="text-slate-600 dark:text-slate-300">
-            Throw It is running with active BroadcastChannel sync. You can test multiplayer immediately across separate browser tabs/windows! To connect distant players over the public internet, add your Supabase credentials to <code className="bg-slate-200 dark:bg-slate-900 px-1 py-0.5 rounded text-cyan-800 dark:text-cyan-300">.env</code>.
-          </p>
+      {/* Network Sync Notice */}
+      <div className="mb-4 p-3.5 rounded-2xl bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/60 text-cyan-900 dark:text-cyan-200 text-xs flex flex-col gap-1 shadow-sm">
+        <div className="flex items-center gap-2 font-bold text-cyan-700 dark:text-cyan-300">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+          Live Realtime Multiplayer Ready
         </div>
-      )}
+        <p className="text-slate-600 dark:text-slate-300">
+          Syncs instantly across multiple browser tabs and windows on your computer, as well as P2P WebRTC across devices!
+          {isSupabaseConfigured && ' Supabase cloud sync is active.'}
+        </p>
+      </div>
 
       {errorMessage && (
-        <div className="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/40 text-red-700 dark:text-red-300 text-xs font-semibold">
-          {errorMessage}
+        <div className="mb-4 p-3.5 rounded-xl bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/40 text-red-700 dark:text-red-300 text-xs font-semibold flex items-center justify-between">
+          <span>{errorMessage}</span>
+          <button
+            onClick={() => setErrorMessage(null)}
+            className="text-red-500 hover:text-red-700 dark:hover:text-red-200 font-bold ml-2 text-sm"
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -240,40 +246,56 @@ export const OnlineLobby: React.FC = () => {
                 <Users className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
                 Players in Room ({currentRoom.players.length}/7)
               </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">Min 2 required</span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                canStart
+                  ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300'
+              }`}>
+                {canStart ? 'Ready to Start' : 'Waiting for 2nd Player...'}
+              </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {currentRoom.players.map((p, idx) => (
-                <div
-                  key={p.id}
-                  className="p-3 rounded-2xl bg-slate-50 dark:bg-game-surfaceLight border border-slate-200 dark:border-slate-700/60 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span
-                      className="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-white shrink-0 relative shadow-sm"
-                      style={{ backgroundColor: p.color }}
-                    >
-                      <AvatarIcon avatar={p.avatar} className="w-4 h-4" />
-                    </span>
-                    <div className="truncate">
-                      <div className="text-sm font-bold text-slate-900 dark:text-white truncate flex items-center gap-1.5">
-                        <span>{p.name}</span>
-                        {p.id === currentRoom.hostId && (
-                          <span title="Host"><Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" /></span>
-                        )}
-                      </div>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                        {p.id === localPlayerId ? 'You' : `Player ${idx + 1}`}
+              {currentRoom.players.map((p, idx) => {
+                const isYou = p.id === localPlayerId;
+                const isPlayerHost = p.id === currentRoom.hostId;
+                return (
+                  <div
+                    key={p.id}
+                    className={`p-3.5 rounded-2xl border flex items-center justify-between transition ${
+                      isYou
+                        ? 'bg-cyan-50/50 dark:bg-cyan-950/20 border-cyan-300 dark:border-cyan-700/60 shadow-sm'
+                        : 'bg-slate-50 dark:bg-game-surfaceLight border-slate-200 dark:border-slate-700/60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span
+                        className="w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-white shrink-0 relative shadow-sm"
+                        style={{ backgroundColor: p.color }}
+                      >
+                        <AvatarIcon avatar={p.avatar} className="w-5 h-5" />
                       </span>
+                      <div className="truncate">
+                        <div className="text-sm font-bold text-slate-900 dark:text-white truncate flex items-center gap-1.5">
+                          <span>{p.name}</span>
+                          {isPlayerHost && (
+                            <span title="Host">
+                              <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                          {isYou ? '⭐ You' : `Player ${idx + 1}`}
+                        </span>
+                      </div>
                     </div>
-                  </div>
 
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
-                    Ready
-                  </span>
-                </div>
-              ))}
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
+                      Ready
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -282,14 +304,19 @@ export const OnlineLobby: React.FC = () => {
             {isHost ? (
               <button
                 onClick={handleStartMatch}
-                disabled={currentRoom.players.length < 2}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-base shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
+                disabled={!canStart}
+                className={`w-full py-4 rounded-2xl font-black text-base shadow-lg flex items-center justify-center gap-2 transition active:scale-95 ${
+                  canStart
+                    ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 shadow-emerald-500/25 animate-pulse'
+                    : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed shadow-none'
+                }`}
               >
                 <Play className="w-5 h-5 fill-current" />
-                START ONLINE MATCH
+                {canStart ? `START ONLINE MATCH (${currentRoom.players.length} PLAYERS)` : 'WAITING FOR PLAYERS (MIN 2)'}
               </button>
             ) : (
-              <div className="text-center py-3 text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-medium">
+              <div className="text-center py-4 rounded-2xl bg-slate-50 dark:bg-game-surfaceLight border border-slate-200 dark:border-game-border text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-cyan-500" />
                 Waiting for room host to start the game...
               </div>
             )}
@@ -404,9 +431,11 @@ export const OnlineLobby: React.FC = () => {
 
               <button
                 onClick={handleJoinRoom}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-sm shadow-lg shadow-emerald-500/20 active:scale-95 transition"
+                disabled={isJoining || !joinCodeInput.trim()}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-sm shadow-lg shadow-emerald-500/20 active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                JOIN ROOM
+                {isJoining && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isJoining ? 'JOINING ROOM...' : 'JOIN ROOM'}
               </button>
             </div>
           )}

@@ -3,6 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { isValidMove } from '../engine/gameEngine';
 import type { Player } from '../engine/types';
+import { getLocalPlayerId } from '../online/onlineRoomManager';
 
 export const GameBoard: React.FC = () => {
   const {
@@ -18,10 +19,13 @@ export const GameBoard: React.FC = () => {
 
   if (!gameState) return null;
 
-  const { board, players, currentTurnIndex, winner, status, config } = gameState;
+  const { board, players, currentTurnIndex, winner, status, config, mode } = gameState;
   const activePlayer = players[currentTurnIndex];
   const isGameOver = status === 'won' || status === 'draw';
-  const isInputLocked = isGameOver || isRobotThinking;
+  const localPlayerId = getLocalPlayerId();
+  const isOnline = mode === 'online';
+  const isMyTurn = !isOnline || activePlayer.id === localPlayerId;
+  const isInputLocked = isGameOver || isRobotThinking || !isMyTurn;
 
   // Keyboard navigation for column selection (ArrowLeft / ArrowRight / Enter / Space)
   useEffect(() => {
@@ -59,6 +63,20 @@ export const GameBoard: React.FC = () => {
 
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-full px-2 sm:px-4 py-2">
+      {/* Online Turn Status Pill */}
+      {isOnline && !isGameOver && (
+        <div
+          className={`mb-2 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 shadow-sm border transition-all ${
+            isMyTurn
+              ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/30 ring-2 ring-emerald-500/20 animate-pulse'
+              : 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-500/30'
+          }`}
+        >
+          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: activePlayer.color }} />
+          {isMyTurn ? "Your turn! Click an open column to drop." : `Waiting for ${activePlayer.name}'s move...`}
+        </div>
+      )}
+
       {/* Top Drop Indicator Bar */}
       <div
         className="grid gap-1.5 sm:gap-2 mb-2 w-full max-w-[580px] px-3 sm:px-4"
