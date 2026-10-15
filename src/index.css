@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-primary: #0d111d;
+    --bg-surface: #151b2d;
+    --text-primary: #f8fafc;
+  }
+
+  html.light {
+    --bg-primary: #f4f6fb;
+    --bg-surface: #ffffff;
+    --text-primary: #0f172a;
+  }
+
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    overflow-x: hidden;
+    user-select: none;
+  }
+
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* Custom visual cues for board and coins */
+.board-grid-shadow {
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.1);
+}
+
+.board-cell-hole {
+  box-shadow: inset 0 5px 10px rgba(0, 0, 0, 0.6), 0 1px 2px rgba(255, 255, 255, 0.15);
+}
+
+.coin-gloss {
+  background: radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.15) 35%, rgba(0, 0, 0, 0.35) 90%);
+}
+
+.neon-border {
+  box-shadow: 0 0 15px rgba(6, 182, 212, 0.35);
+}
+
+/* Hide scrollbar for clean mobile tabs */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
